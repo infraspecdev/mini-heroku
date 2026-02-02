@@ -26,10 +26,8 @@ This document provides a granular breakdown of the 8-week internship project. It
         *   Verify Mentee's machine environment (Go + Docker Desktop/Engine installed).
     *   **Mentee:**
         *   **Task 1.1: Project Analysis.** Research how Heroku/Vercel handles "git push" deployments and compare it to our approach.
-        *   **Task 1.2: Architecture Design.** Create a detailed sequence diagram (using Mermaid) showing the request flow from `mini deploy` to a live URL.
-        *   **Task 1.3: Design Pitch.** Present the proposed approach to the mentor. Discuss how the CLI will communicate with the Server (REST vs. others).
-        *   **Task 1.4: SDK Basics.** Initialize Go module (`go mod init`) and write a script to connect to the Docker client and print the Docker version.
-        *   **Task 1.5: Container Lifecycle.** Write functions to list running containers and pull/run an `alpine` container via the SDK.
+        *   **Task 1.2: SDK Basics.** Initialize Go module (`go mod init`) and write a script to connect to the Docker client and print the Docker version.
+        *   **Task 1.3: Container Lifecycle.** Write functions to list running containers and pull/run an `alpine` container via the SDK.
 
 *   **Task Assignment:**
     *   Tasks 1.1 - 1.3: Collaborative. Both mentees work together on the research and design document.
@@ -59,3 +57,127 @@ This document provides a granular breakdown of the 8-week internship project. It
     *   Mentee A: **The Courier.** Focuses on File I/O, recursion, and creating a valid Tar stream.
     *   Mentee B: **The Factory.** Focuses on the HTTP Server and strictly typing the Docker `ImageBuild` options.
     *   **Integration:** On Thursday, connect Mentee A's "Tar Stream" into Mentee B's "Upload Handler".
+
+## Phase 2: Cloud & Networking (Weeks 3-5)
+
+### Week 3: Cloud Migration & CI/CD
+**Goal:** Move the Controller from "Localhost" to a real Cloud VM.
+
+**Learning Resources**
+* **DevOps:** [GitHub Actions for Go](https://github.com/features/actions)
+* **Linux:** [Systemd Service Guide](https://www.digitalocean.com/community/tutorials/how-to-use-systemctl-to-manage-systemd-services-and-units)
+
+**Mentee Tasks**
+* **Task 3.1: VM Setup (Mentee A)**
+    * *Component:* **Infrastructure**
+    * Provision Cloud VM AWS. Install Docker, Go. Secure Firewall (Ports 22, 80, 443).
+* **Task 3.2: CI/CD Pipeline (Mentee B)**
+    * *Component:* **Infrastructure**
+    * Create `.github/workflows/deploy.yml`: Build binary -> SCP to VM -> Restart Service.
+* **Task 3.3: Systemd Service (Joint)**
+    * *Component:* **Infrastructure**
+    * Write `mini-heroku.service` for auto-restart on boot/crash.
+
+**Deliverable:** A live server IP that updates automatically on `git push`.
+
+---
+
+### Week 4: The Reverse Proxy
+**Goal:** Route incoming traffic (e.g., `app.domain.com`) to the correct container.
+
+**Learning Resources**
+* **Go Lib:** [httputil.ReverseProxy](https://pkg.go.dev/net/http/httputil#ReverseProxy)
+* **DNS:** [Magic Domain (nip.io)](https://nip.io/)
+
+**Mentee Tasks**
+* **Task 4.1: Dynamic Routing (Mentee A)**
+    * *Component:* **Reverse Proxy**
+    * Create HTTP Handler on Port 80. Inspect `Host` header (e.g., `blog.1.2.3.4.nip.io`).
+* **Task 4.2: Proxy Logic (Mentee B)**
+    * *Component:* **Reverse Proxy**
+    * Implement logic: If Host == X, forward to Container IP Y.
+* **Task 4.3: Integration (Joint)**
+    * *Component:* **Controller & Proxy**
+    * Hardcode a map (`app -> container_ip`) to verify routing works.
+
+**Deliverable:** Accessing a container via a public URL.
+
+---
+
+### Week 5: State & Persistence
+**Goal:** Ensure system remembers apps after a restart using a Database.
+
+**Learning Resources**
+* **DB:** [GORM with SQLite](https://gorm.io/docs/connecting_to_the_database.html#SQLite)
+
+**🛠 Mentee Tasks**
+* **Task 5.1: Schema Design (Mentee A)**
+    * *Component:* **Database**
+    * Design structs: `Project` (Name, Port, ContainerID, CreatedAt).
+* **Task 5.2: DB Integration (Mentee B)**
+    * *Component:* **Controller**
+    * Initialize SQLite. Update `Deploy` function to save container details to DB.
+* **Task 5.3: Reconciliation (Joint)**
+    * *Component:* **Controller**
+    * On startup: Query DB -> Check Docker -> Restart missing containers.
+
+**Deliverable:** Platform survives server restart without data loss.
+
+---
+
+## Phase 3: The CLI & Polish (Weeks 6-8)
+
+### Week 6: The CLI Tool
+**Goal:** Build the `mini` command-line tool for users.
+
+**Learning Resources**
+* **Lib:** [Cobra Framework](https://github.com/spf13/cobra)
+* **HTTP:** [Multipart Uploads](https://pkg.go.dev/mime/multipart)
+
+**Mentee Tasks**
+* **Task 6.1: CLI Skeleton (Mentee A)**
+    * *Component:* **CLI**
+    * Init Cobra. Create `mini version`, `mini deploy`.
+* **Task 6.2: Upload Client (Mentee B)**
+    * *Component:* **CLI**
+    * Implement client logic: Zip folder -> POST to Server.
+* **Task 6.3: Config (Joint)**
+    * *Component:* **CLI**
+    * Add `mini config set-host <url>` to point CLI to Cloud VM.
+
+**Deliverable:** Deploying from laptop to Cloud VM via terminal.
+
+---
+
+### Week 7: Observability & Security
+**Goal:** Allow users to see logs and secure the platform.
+
+**Mentee Tasks**
+* **Task 7.1: Log Streaming (Mentee A)**
+    * *Component:* **Controller & CLI**
+    * Implement `mini logs <app>`. Pipe Docker logs to HTTP Response -> CLI Stdout.
+* **Task 7.2: Authentication (Mentee B)**
+    * *Component:* **Controller & CLI**
+    * Add API Key header check. Reject unauthorized requests.
+
+**Deliverable:** `mini logs` works; Platform is secured.
+
+---
+
+### Week 8: Documentation & Demo
+**Goal:** Final polish and presentation.
+
+**Mentee Tasks**
+* **Task 8.1: Cleanup (Joint)**
+    * *Component:* **All**
+    * Remove hardcoded paths, add comments, fix error handling.
+* **Task 8.2: Docs (Mentee A)**
+    * *Component:* **Docs**
+    * Write `README.md` (Installation, Usage).
+* **Task 8.3: Demo Prep (Mentee B)**
+    * *Component:* **Demo**
+    * Prepare script. Practice deploying a "TODO app" live.
+
+**Deliverable:** Polished repo and successful live demo.
+
+---
