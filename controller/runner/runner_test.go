@@ -40,6 +40,16 @@ func TestRunContainer_Success(t *testing.T) {
 		t.Error("ContainerCreate was not called")
 	}
 
+	expectedPort := "8080/tcp"
+	if _, exists := mockClient.CreateConfig.ExposedPorts[expectedPort]; !exists {
+		t.Errorf("Port %s not exposed", expectedPort)
+	}
+
+	hostPortBindings := mockClient.CreateHostConfig.PortBindings["8080/tcp"]
+	if len(hostPortBindings) == 0 || hostPortBindings[0].HostPort != "8888" {
+		t.Errorf("Expected host port 8888, got %v", hostPortBindings)
+	}
+
 	if !mockClient.StartCalled {
 		t.Error("ContainerStart was not called")
 	}
