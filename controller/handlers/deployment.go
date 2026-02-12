@@ -16,12 +16,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate content type
-	if r.Header.Get("Content-Type") != "application/x-gzip" {
+	if r.Header.Get(HeaderContentType) != ContentTypeGzip {
 		sendError(w, http.StatusBadRequest, "Content-Type must be application/x-gzip")
 		return
 	}
 
-	appName := r.Header.Get("App-Name")
+	appName := r.Header.Get(HeaderAppName)
 	if appName == "" {
 		appName = "app-temp"
 	}
@@ -45,7 +45,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func sendSuccess(w http.ResponseWriter, appURL, message string) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(HeaderContentType, ContentTypeJSON)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(DeploymentResponse{
 		Status:  StatusSuccess,
@@ -55,7 +55,7 @@ func sendSuccess(w http.ResponseWriter, appURL, message string) {
 }
 
 func sendError(w http.ResponseWriter, statusCode int, message string) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(HeaderContentType, ContentTypeJSON)
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(DeploymentResponse{
 		Status:  StatusError,
