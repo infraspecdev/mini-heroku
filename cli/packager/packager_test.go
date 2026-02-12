@@ -4,6 +4,11 @@ import (
     "os"
     "path/filepath"
     "testing"
+	"archive/tar"
+    "bytes"
+    "compress/gzip"
+    "io"
+
 )
 
 func TestFileDiscovery(t *testing.T) {
@@ -59,3 +64,68 @@ func createFile(t *testing.T, dir, path, content string) {
         t.Fatal(err)
     }
 }
+
+
+func TestTarballGeneration(t *testing.T) {
+    // Setup: Define test files
+    files := map[string]string{
+        "main.go": "package main\n\nfunc main() {}",
+        "handler.go": "package handler",
+        "README.md": "# My App",
+    }
+    
+    // Execute: Create tarball
+    tarballBytes, err := CreateTarball(files)
+    if err != nil {
+        t.Fatalf("CreateTarball failed: %v", err)
+    }
+    
+    // Assert: Verify it's a valid tar.gz
+    // Step 1: Decompress gzip
+    gzipReader, err := gzip.NewReader(bytes.NewReader(tarballBytes))
+    if err != nil {
+        t.Fatalf("Invalid gzip: %v", err)
+    }
+    defer gzipReader.Close()
+    
+    // Step 2: Read tar contents
+    tarReader := tar.NewReader(gzipReader)
+    
+    foundFiles := make(map[string]string)
+    
+    for {
+        header, err := tarReader.Next()
+        if err == io.EOF {
+            break // End of tar archive
+        }
+        if err != nil {
+            t.Fatalf("Error reading tar: %v", err)
+        }
+        
+        // Read file content
+        content := make([]byte, header.Size)
+        if _, err := io.ReadFull(tarReader, content); err != nil {
+            t.Fatalf("Error reading file content: %v", err)
+        }
+        
+        foundFiles[header.Name] = string(content)
+    }
+    
+    // Assert: All files present with correct content
+    if len(foundFiles) != len(files) {
+        t.Errorf("Expected %d files, got %d", len(files), len(foundFiles))
+    }
+    
+    for name, expectedContent := range files {
+        actualContent, exists := foundFiles[name]
+        if !exists {
+            t.Errorf("File %s missing from tarball", name)
+            continue
+        }
+        if actualContent != expectedContent {
+            t.Errorf("File %s content mismatch.\nExpected: %q\nGot: %q", 
+                name, expectedContent, actualContent)
+        }
+    }
+}
+
