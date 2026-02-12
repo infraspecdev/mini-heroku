@@ -49,6 +49,6 @@ func TestBuildImage (t *testing.T){
 	expectedTag := "test-app:latest"
 
 	if imageID != expectedTag{
-		t.Fatalf("expected is %s, got %s",expectedTag, &imageID)
+		t.Fatalf("expected is %s, got %s",expectedTag, imageID)
 	}
 }
