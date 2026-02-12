@@ -10,7 +10,7 @@ import (
 
 type ImageBuildOptions struct {
 	Tags       []string
-	DockerFile string
+	Dockerfile string
 	Remove     bool
 }
 type ImageBuildResponse struct {
@@ -29,7 +29,7 @@ type buildMessage struct {
 func BuildImage(client DockerClient, tarballReader io.Reader, appName string) (string, error) {
 	options := ImageBuildOptions{
 		Tags:       []string{appName + ":latest"},
-		DockerFile: "Dockefile",
+		Dockerfile: "Dockefile",
 		Remove:     true,
 	}
 
@@ -37,7 +37,6 @@ func BuildImage(client DockerClient, tarballReader io.Reader, appName string) (s
 
 	if err != nil {
 		return "", fmt.Errorf("docker build failed: %w", err)
-
 	}
 
 	defer resp.Body.Close()
