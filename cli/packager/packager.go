@@ -1,6 +1,9 @@
 package packager
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -80,4 +83,46 @@ func ExploreDirectory(rootPath string) ([]string, error) {
 	}
 
 	return files, nil
+}
+
+
+// -----------------------------
+// CreateTarball
+// Creates in-memory tar.gz archive
+// -----------------------------
+
+func CreateTarball(files map[string]string) ([]byte, error) {
+	var buf bytes.Buffer
+
+	// gzip wraps tar
+	gzipWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzipWriter)
+
+	for name, content := range files {
+
+		header := &tar.Header{
+			Name: name,
+			Mode: 0644,
+			Size: int64(len(content)),
+		}
+
+		if err := tarWriter.WriteHeader(header); err != nil {
+			return nil, fmt.Errorf("writing header: %w", err)
+		}
+
+		if _, err := tarWriter.Write([]byte(content)); err != nil {
+			return nil, fmt.Errorf("writing content: %w", err)
+		}
+	}
+
+	// Close in reverse order
+	if err := tarWriter.Close(); err != nil {
+		return nil, fmt.Errorf("closing tar writer: %w", err)
+	}
+
+	if err := gzipWriter.Close(); err != nil {
+		return nil, fmt.Errorf("closing gzip writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }
