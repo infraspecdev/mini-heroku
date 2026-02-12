@@ -6,6 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
+)
+
+const (
+	DefaultDockerfile = "Dockerfile"
+	ImageTagSuffix    = ":latest"
 )
 
 type ImageBuildOptions struct {
@@ -26,12 +32,16 @@ type buildMessage struct {
 	Error  string `json:"error"`
 }
 
-func BuildImage(client DockerClient, tarballReader io.Reader, appName string) (string, error) {
-	options := ImageBuildOptions{
-		Tags:       []string{appName + ":latest"},
-		Dockerfile: "Dockefile",
+func NewImageBuildOptions(appName string) ImageBuildOptions {
+	return ImageBuildOptions{
+		Tags:       []string{appName + ImageTagSuffix},
+		Dockerfile: DefaultDockerfile,
 		Remove:     true,
 	}
+}
+
+func BuildImage(client DockerClient, tarballReader io.Reader, appName string) (string, error) {
+	options := NewImageBuildOptions(appName)
 
 	resp, err := client.ImageBuild(context.Background(), tarballReader, options)
 
@@ -47,12 +57,22 @@ func BuildImage(client DockerClient, tarballReader io.Reader, appName string) (s
 	for scanner.Scan() {
 		var msg buildMessage
 		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
-			continue
+			continue //skip malformed lines
 		}
 
+		// Check for errors in build output
 		if msg.Error != "" {
 			buildError = msg.Error
 		}
+
+		// Log build progress
+		if msg.Stream != "" {
+			msg.Stream = strings.TrimSpace(msg.Stream)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("reading build output: %w", err)
 	}
 
 	if buildError != "" {

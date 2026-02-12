@@ -19,11 +19,15 @@ type MockDockerClient struct {
 func (m *MockDockerClient) ImageBuild(ctx context.Context, buildContext io.Reader, options ImageBuildOptions) (ImageBuildResponse, error) {
 	m.BuildCalled = true
 	m.BuildOptions = options
-	m.BuildContext, _ = io.ReadAll(buildContext)
+
+	var err error
+	m.BuildContext, err = io.ReadAll(buildContext)
+	if err != nil {
+		return ImageBuildResponse{}, err
+	}
 
 	if m.ReturnError != nil {
 		return ImageBuildResponse{}, m.ReturnError
-
 	}
 
 	body := m.ReturnBody
