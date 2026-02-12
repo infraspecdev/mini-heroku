@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 )
 
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -15,6 +18,26 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	// Validate content type
 	if r.Header.Get("Content-Type") != "application/x-gzip" {
 		sendError(w, http.StatusBadRequest, "Content-Type must be application/x-gzip")
+		return
+	}
+
+	appName := r.Header.Get("App-Name")
+	if appName == "" {
+		appName = "app-temp"
+	}
+
+	tempDir := os.TempDir()
+	tarballPath := filepath.Join(tempDir, appName+".tar.gz")
+
+	file, err := os.Create(tarballPath)
+	if err != nil {
+		sendError(w, http.StatusInternalServerError, "Failed to create temp file")
+		return
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(file, r.Body); err != nil {
+		sendError(w, http.StatusInternalServerError, "Failed to save upload")
 		return
 	}
 
