@@ -88,3 +88,19 @@ func TestBuildImage_BuildFailureOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestBuildImage_StreamsContext(t *testing.T) {
+	mockClient := &MockDockerClient{}
+
+	largeData := bytes.Repeat([]byte("test "), 10000)
+
+	_, err := BuildImage(mockClient, bytes.NewReader(largeData), "test-app")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !bytes.Equal(mockClient.BuildContext, largeData) {
+		t.Fatal("build context mismatch")
+	}
+}
