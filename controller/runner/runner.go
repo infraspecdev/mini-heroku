@@ -31,19 +31,35 @@ type RunnerClient interface {
 func RunContainer(client RunnerClient, imageName string, hostPort int) (string, error) {
 	ctx := context.Background()
 
-	config := ContainerConfig{
-		Image: imageName,
+	exposedPorts := map[string]struct{}{
+		"8080/tcp": {},
 	}
 
-	hostConfig := HostConfig{}
+	portBindings := map[string][]PortBinding{
+		"8080/tcp": {
+			{
+				HostIP:   "0.0.0.0",
+				HostPort: fmt.Sprintf("%d", hostPort),
+			},
+		},
+	}
+
+	config := ContainerConfig{
+		Image:        imageName,
+		ExposedPorts: exposedPorts,
+	}
+
+	hostConfig := HostConfig{
+		PortBindings: portBindings,
+	}
 
 	resp, err := client.ContainerCreate(ctx, config, hostConfig)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("creating container: %w", err)
 	}
 
 	if err := client.ContainerStart(ctx, resp.ID); err != nil {
-		return "", err
+		return "", fmt.Errorf("starting container: %w", err)
 	}
 
 	return fmt.Sprintf("http://localhost:%d", hostPort), nil
