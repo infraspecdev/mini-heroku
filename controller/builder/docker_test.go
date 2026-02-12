@@ -16,12 +16,12 @@ type MockDockerClient struct {
 	ReturnBody   string
 }
 
-func (m *MockDockerClient) ImageBuild(ctx context.Context, buildContext io.Reader, options ImageBuildOptions)( ImageBuildResponse, error){
+func (m *MockDockerClient) ImageBuild(ctx context.Context, buildContext io.Reader, options ImageBuildOptions) (ImageBuildResponse, error) {
 	m.BuildCalled = true
 	m.BuildOptions = options
 	m.BuildContext, _ = io.ReadAll(buildContext)
 
-	if m.ReturnError != nil{
+	if m.ReturnError != nil {
 		return ImageBuildResponse{}, m.ReturnError
 
 	}
@@ -36,25 +36,24 @@ func (m *MockDockerClient) ImageBuild(ctx context.Context, buildContext io.Reade
 	}, nil
 }
 
-
-func TestBuildImage (t *testing.T){
+func TestBuildImage(t *testing.T) {
 	mockClient := &MockDockerClient{}
 	tarball := []byte("fake-tar")
 
 	imageID, err := BuildImage(mockClient, bytes.NewReader(tarball), "test-app")
 
-	if err != nil{
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !mockClient.BuildCalled{
+	if !mockClient.BuildCalled {
 		t.Fatal("ImageBuild was not called")
 	}
 
 	expectedTag := "test-app:latest"
 
-	if imageID != expectedTag{
-		t.Fatalf("expected is %s, got %s",expectedTag, imageID)
+	if imageID != expectedTag {
+		t.Fatalf("expected is %s, got %s", expectedTag, imageID)
 	}
 }
 
@@ -71,5 +70,21 @@ func TestBuildImage_DockerInvocationError(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "docker build failed") {
 		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestBuildImage_BuildFailureOutput(t *testing.T) {
+	mockClient := &MockDockerClient{
+		ReturnBody: `{"error":"manifest not found"}`,
+	}
+
+	_, err := BuildImage(mockClient, bytes.NewReader([]byte("data")), "test-app")
+
+	if err == nil {
+		t.Fatal("expected build error")
+	}
+
+	if !strings.Contains(err.Error(), "manifest not found") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
