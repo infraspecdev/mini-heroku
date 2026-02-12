@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -25,12 +26,16 @@ func (m *MockDockerClient) ImageBuild(ctx context.Context, buildContext io.Reade
 
 	}
 
-	body := `{"stream":"Successfully built abc123"}`
+	body := m.ReturnBody
+	if body == "" {
+		body = `{"stream":"Successfully built abc123"}`
+	}
 
 	return ImageBuildResponse{
 		Body: io.NopCloser(bytes.NewBufferString(body)),
 	}, nil
 }
+
 
 func TestBuildImage (t *testing.T){
 	mockClient := &MockDockerClient{}
@@ -50,5 +55,21 @@ func TestBuildImage (t *testing.T){
 
 	if imageID != expectedTag{
 		t.Fatalf("expected is %s, got %s",expectedTag, imageID)
+	}
+}
+
+func TestBuildImage_DockerInvocationError(t *testing.T) {
+	mockClient := &MockDockerClient{
+		ReturnError: io.EOF,
+	}
+
+	_, err := BuildImage(mockClient, bytes.NewReader([]byte("data")), "test-app")
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "docker build failed") {
+		t.Fatalf("unexpected error message: %v", err)
 	}
 }
