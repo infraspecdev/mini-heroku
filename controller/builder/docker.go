@@ -67,8 +67,11 @@ func BuildImage(client DockerClient, tarballReader io.Reader, appName string) (s
 
 		// Log build progress
 		if msg.Stream != "" {
-			msg.Stream = strings.TrimSpace(msg.Stream)
-		}
+            msg.Stream = strings.TrimSpace(msg.Stream)
+            if msg.Stream != "" {
+                fmt.Printf("Build: %s\n", msg.Stream)
+            }
+        }
 	}
 
 	if err := scanner.Err(); err != nil {
