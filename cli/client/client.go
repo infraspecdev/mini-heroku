@@ -14,7 +14,7 @@ func UploadPackage(serverURL string, tarballReader io.Reader, appName string) (*
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	// Set headers (CRITICAL)
+	// Set headers
 	req.Header.Set(HeaderContentType, ContentTypeGzip)
 	if appName != "" {
 		req.Header.Set(HeaderAppName, appName)
