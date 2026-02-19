@@ -29,3 +29,32 @@ jobs:
       - name: Test CLI
         working-directory: cli
         run: go test -v ./...
+
+  build:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    needs: test # Only run if tests pass
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25.6"
+          cache: true
+          cache-dependency-path: |
+            controller/go.sum
+            cli/go.sum
+
+      - name: Build Controller
+        working-directory: controller
+        run: GOOS=linux GOARCH=amd64 go build -o controller-linux -v
+
+      - name: Upload Controller Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: controller-binary
+          path: controller/controller-linux
+          retention-days: 1
