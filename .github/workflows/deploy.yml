@@ -58,3 +58,26 @@ jobs:
           name: controller-binary
           path: controller/controller-linux
           retention-days: 1
+
+  deploy:
+    name: Deploy to VM
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download Controller Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: controller-binary
+
+      - name: Test SSH Connection
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VM_IP}}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "SSH Connection successfull"
+            whoami
+            pwd
+            docker --version
