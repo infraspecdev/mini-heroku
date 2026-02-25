@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"os"
 )
 
 type ContainerConfig struct {
@@ -62,5 +63,10 @@ func RunContainer(client RunnerClient, imageName string, hostPort int) (string, 
 		return "", fmt.Errorf("starting container: %w", err)
 	}
 
-	return fmt.Sprintf("http://localhost:%d", hostPort), nil
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost"
+	}
+
+	return fmt.Sprintf("%s:%d", baseURL, hostPort), nil
 }
