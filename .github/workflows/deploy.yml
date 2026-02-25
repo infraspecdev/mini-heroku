@@ -104,3 +104,30 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "controller-linux"
           target: "/tmp"
+
+
+      # ----------------------------- Deploy and Restart Service -----------------------------
+      - name: Deploy and Restart Service
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 10.30.20.33
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "=== Starting Deployment ==="
+
+            sudo systemctl stop mini-heroku || true
+
+            if [ -f /opt/mini-heroku/bin/controller ]; then
+              sudo cp /opt/mini-heroku/bin/controller \
+                /opt/mini-heroku/bin/controller.backup.$(date +%Y%m%d-%H%M%S)
+            fi
+
+            sudo mv /tmp/controller-linux /opt/mini-heroku/bin/controller
+            sudo chown venkidesh:venkidesh /opt/mini-heroku/bin/controller
+            sudo chmod +x /opt/mini-heroku/bin/controller
+
+            sudo systemctl daemon-reload
+            sudo systemctl restart mini-heroku
+
+            echo "=== Deployment Complete ==="
