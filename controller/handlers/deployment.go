@@ -46,7 +46,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendSuccess(w, "http://localhost:8888", "App deployed successfully")
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost"
+	}
+
+	sendSuccess(w, fmt.Sprintf("%s:%d", baseURL, HostPort), "App deployed successfully")
 }
 
 func UploadHandlerWithDocker(w http.ResponseWriter, r *http.Request, dockerBuilder builder.DockerClient, dockerRunner runner.RunnerClient) {
