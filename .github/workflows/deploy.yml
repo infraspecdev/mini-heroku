@@ -12,6 +12,9 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [controller, cli]
 
     steps:
       - name: Checkout code
@@ -22,12 +25,8 @@ jobs:
         with:
           go-version: "1.25.6"
 
-      - name: Test Controller
-        working-directory: controller
-        run: go test -v ./...
-
-      - name: Test CLI
-        working-directory: cli
+      - name: Run Tests
+        working-directory: ${{ matrix.module }}
         run: go test -v ./...
 
   build:
@@ -50,7 +49,13 @@ jobs:
 
       - name: Build Controller
         working-directory: controller
-        run: GOOS=linux GOARCH=amd64 go build -o controller-linux -v
+        run: |
+          VERSION=$(git rev-parse --short HEAD)
+          BUILD_TIME=$(date -u +%Y-%m-%d_%H:%M:%S)
+
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" \
+            -o controller-linux -v
 
       - name: Upload Controller Artifact
         uses: actions/upload-artifact@v4
