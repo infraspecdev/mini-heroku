@@ -105,7 +105,6 @@ jobs:
           source: "controller-linux"
           target: "/tmp"
 
-
       # ----------------------------- Deploy and Restart Service -----------------------------
       - name: Deploy and Restart Service
         uses: appleboy/ssh-action@v1
@@ -131,3 +130,23 @@ jobs:
             sudo systemctl restart mini-heroku
 
             echo "=== Deployment Complete ==="
+
+      # ----------------------------- Verify Deployment -----------------------------
+      - name: Verify Service Status
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 10.30.20.33
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "=== Verifying Service ==="
+
+            if sudo systemctl is-active --quiet mini-heroku; then
+              echo "Service is running"
+            else
+              echo "Service failed to start"
+              sudo journalctl -u mini-heroku -n 50 --no-pager
+              exit 1
+            fi
+
+            echo "=== Verification Successful ==="
