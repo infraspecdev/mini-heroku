@@ -80,24 +80,17 @@ jobs:
           ips: "50.50.50.7/32"
           allowed_ips: "10.30.0.0/20,10.30.16.0/20"
 
-      # ----------------------------- Verify VPN -----------------------------
-      - name: Verify VPN Connection
-        run: |
-          echo "Pinging private EC2..."
-          ping -c 3 10.30.20.33   # <-- Replace with your EC2 private IP
+      # ----------------------------- Check WireGuard Connection -----------------------------
+      - name: Check WireGuard
+        run: sudo wg
 
-      # ----------------------------- Deploy via SSH -----------------------------
-      - name: Deploy to EC2 via Private IP
-        uses: appleboy/ssh-action@v1.0.0
+      # ----------------------------- Test SSH Connectivity -----------------------------
+      - name: Test SSH Connectivity
+        uses: appleboy/ssh-action@v1
         with:
-          host: 10.30.20.33   # <-- Replace with your EC2 private IP
+          host: 10.30.20.33
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /opt/mini-heroku
-            git pull origin main
-            cd controller
-            go build -o controller
-            sudo mv controller /opt/mini-heroku/bin/controller
-            sudo systemctl restart mini-heroku
-            sudo systemctl status mini-heroku --no-pager
+            echo "Connected via VPN"
+            whoami
