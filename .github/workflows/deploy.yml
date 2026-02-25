@@ -94,3 +94,13 @@ jobs:
           script: |
             echo "Connected via VPN"
             whoami
+
+      # ----------------------------- Copy Binary to VM -----------------------------
+      - name: Copy Controller Binary to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: 10.30.20.33
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "controller-linux"
+          target: "/tmp"
