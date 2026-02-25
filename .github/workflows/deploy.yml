@@ -60,7 +60,7 @@ jobs:
           retention-days: 1
 
   deploy:
-    name: Deploy to VM
+    name: Deploy to Private VM via VPN
     runs-on: ubuntu-latest
     needs: build
 
@@ -70,14 +70,34 @@ jobs:
         with:
           name: controller-binary
 
-      - name: Test SSH Connection
+      # ----------------------------- Setup WireGuard -----------------------------
+      - name: Setup WireGuard VPN
+        uses: egor-tensin/setup-wireguard@v1
+        with:
+          endpoint: ${{ secrets.WG_SERVER_ENDPOINT }}
+          endpoint_public_key: ${{ secrets.WG_SERVER_PUBLIC_KEY }}
+          private_key: ${{ secrets.WG_PRIVATE_KEY }}
+          ips: "50.50.50.7/32"
+          allowed_ips: "10.30.0.0/20,10.30.16.0/20"
+
+      # ----------------------------- Verify VPN -----------------------------
+      - name: Verify VPN Connection
+        run: |
+          echo "Pinging private EC2..."
+          ping -c 3 10.30.20.33   # <-- Replace with your EC2 private IP
+
+      # ----------------------------- Deploy via SSH -----------------------------
+      - name: Deploy to EC2 via Private IP
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.VM_IP}}
-          username: ${{ secrets.VM_USER }}
+          host: 10.30.20.33   # <-- Replace with your EC2 private IP
+          username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "SSH Connection successfull"
-            whoami
-            pwd
-            docker --version
+            cd /opt/mini-heroku
+            git pull origin main
+            cd controller
+            go build -o controller
+            sudo mv controller /opt/mini-heroku/bin/controller
+            sudo systemctl restart mini-heroku
+            sudo systemctl status mini-heroku --no-pager
