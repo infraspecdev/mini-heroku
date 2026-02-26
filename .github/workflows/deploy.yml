@@ -67,6 +67,9 @@ jobs:
     needs: build
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download Controller Artifact
         uses: actions/download-artifact@v4
         with:
@@ -107,6 +110,15 @@ jobs:
           source: "controller-linux"
           target: "/tmp"
 
+      - name: Copy systemd service file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.TARGET_PRIVATE_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: infra/systemd/mini-heroku.service
+          target: /tmp
+
       # ----------------------------- Deploy and Restart Service -----------------------------
       - name: Deploy and Restart Service
         uses: appleboy/ssh-action@v1
@@ -119,16 +131,22 @@ jobs:
 
             sudo systemctl stop mini-heroku || true
 
+            # Backup binary
             if [ -f /opt/mini-heroku/bin/controller ]; then
               sudo cp /opt/mini-heroku/bin/controller \
                 /opt/mini-heroku/bin/controller.backup.$(date +%Y%m%d-%H%M%S)
             fi
 
+            # Move new binary
             sudo mv /tmp/controller-linux /opt/mini-heroku/bin/controller
-            sudo chown venkidesh:venkidesh /opt/mini-heroku/bin/controller
+            sudo chown ubuntu:ubuntu /opt/mini-heroku/bin/controller
             sudo chmod +x /opt/mini-heroku/bin/controller
 
+            # Install updated service file
+            sudo mv /tmp/mini-heroku.service /etc/systemd/system/mini-heroku.service
             sudo systemctl daemon-reload
+            sudo systemctl enable mini-heroku
+
             sudo systemctl restart mini-heroku
 
             echo "=== Deployment Complete ==="

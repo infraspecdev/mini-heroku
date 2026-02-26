@@ -1,0 +1,23 @@
+[Unit]
+Description=Mini Heroku Controller
+Documentation=https://github.com/infraspecdev/mini-heroku
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/mini-heroku/bin
+ExecStart=/opt/mini-heroku/bin/controller
+Restart=on-failure
+RestartSec=10s
+StandardOutput=append:/opt/mini-heroku/logs/controller.log
+StandardError=append:/opt/mini-heroku/logs/controller.log
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
