@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-      - dev/**
-      - feat/**
-  workflow_dispatch: # Allows manual triggering
 
 jobs:
   test:
