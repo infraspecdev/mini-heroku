@@ -69,3 +69,27 @@ func (r *RealRunnerClient) ContainerCreate(ctx context.Context, config Container
 func (r *RealRunnerClient) ContainerStart(ctx context.Context, containerID string) error {
 	return r.client.ContainerStart(ctx, containerID, container.StartOptions{})
 }
+
+func (r *RealRunnerClient) ContainerInspect(ctx context.Context, containerID string) (ContainerInspectResponse, error) {
+
+	inspect, err := r.client.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return ContainerInspectResponse{}, err
+	}
+
+	ip := inspect.NetworkSettings.IPAddress
+
+	// If empty, read from bridge network
+	if ip == "" {
+		for _, network := range inspect.NetworkSettings.Networks {
+			ip = network.IPAddress
+			if ip != "" {
+				break
+			}
+		}
+	}
+
+	return ContainerInspectResponse{
+		IPAddress: ip,
+	}, nil
+}
