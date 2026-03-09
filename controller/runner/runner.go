@@ -23,12 +23,23 @@ type ContainerCreateResponse struct {
 	ID string
 }
 
+type ContainerInspectResponse struct {
+	IPAddress string
+}
+
+type RunResult struct {
+	ContainerID string
+	ContainerIP string
+	HostPort    string
+}
+
 type RunnerClient interface {
 	ContainerCreate(ctx context.Context, config ContainerConfig, hostConfig HostConfig) (ContainerCreateResponse, error)
 	ContainerStart(ctx context.Context, containerID string) error
+	ContainerInspect(ctx context.Context, containerID string) (ContainerInspectResponse, error)
 }
 
-func RunContainer(client RunnerClient, imageName string, hostPort int) (string, error) {
+func RunContainer(client RunnerClient, imageName string, hostPort int) (*RunResult, error) {
 	ctx := context.Background()
 
 	exposedPorts := map[string]struct{}{
@@ -55,12 +66,32 @@ func RunContainer(client RunnerClient, imageName string, hostPort int) (string, 
 
 	resp, err := client.ContainerCreate(ctx, config, hostConfig)
 	if err != nil {
-		return "", fmt.Errorf("creating container: %w", err)
+		return nil, fmt.Errorf("creating container: %w", err)
 	}
 
 	if err := client.ContainerStart(ctx, resp.ID); err != nil {
-		return "", fmt.Errorf("starting container: %w", err)
+		return nil, fmt.Errorf("starting container: %w", err)
 	}
 
-	return fmt.Sprintf("http://localhost:%d", hostPort), nil
+	inspect, err := client.ContainerInspect(ctx, resp.ID)
+	if err != nil {
+		return nil, fmt.Errorf("inspecting container: %w", err)
+	}
+
+	return &RunResult{
+		ContainerID: resp.ID,
+		ContainerIP: inspect.IPAddress,
+		HostPort:    fmt.Sprintf("%d", hostPort),
+	}, nil
+
+}
+
+func GenerateHostPort(appName string) int {
+	hash := 0
+	for _, c := range appName {
+		hash += int(c)
+	}
+
+	port := 10000 + (hash % 10000)
+	return port
 }
