@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mini-heroku/controller/builder"
 	"mini-heroku/controller/runner"
+	"mini-heroku/controller/proxy"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -49,7 +51,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	sendSuccess(w, "http://localhost:8888", "App deployed successfully")
 }
 
-func UploadHandlerWithDocker(w http.ResponseWriter, r *http.Request, dockerBuilder builder.DockerClient, dockerRunner runner.RunnerClient) {
+func UploadHandlerWithDocker(w http.ResponseWriter, r *http.Request, table *proxy.RouteTable, dockerBuilder builder.DockerClient, dockerRunner runner.RunnerClient) {
 	// Validate method
 	if r.Method != http.MethodPost {
 		sendError(w, http.StatusMethodNotAllowed, "Only POST allowed")
@@ -103,15 +105,36 @@ func UploadHandlerWithDocker(w http.ResponseWriter, r *http.Request, dockerBuild
 		return
 	}
 
+	log.Printf("[deploy] image built: %s", imageName)
+
+	// Generate host port
+	hostPort := runner.GenerateHostPort(appName)
+
 	// Run container
-	appURL, err := runner.RunContainer(dockerRunner, imageName, HostPort)
+	result, err := runner.RunContainer(dockerRunner, imageName, hostPort)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to start container: %v", err))
 		return
 	}
 
+	// Build container target URL
+	targetURL := fmt.Sprintf("http://%s:8080", result.ContainerIP)
+
+	// Register route in proxy
+	table.Register(appName, targetURL)
+
+	log.Printf("[deploy] route registered: %s -> %s", appName, targetURL)
+
+	// Build public URL
+	vmIP := os.Getenv("VM_PUBLIC_IP")
+	if vmIP == "" {
+		vmIP = "127.0.0.1"
+	}
+
+	publicURL := fmt.Sprintf("http://%s.%s.nip.io", appName, vmIP)
+
 	// Success!
-	sendSuccess(w, appURL, "App deployed successfully")
+	sendSuccess(w, publicURL, "App deployed successfully")
 }
 
 func sendSuccess(w http.ResponseWriter, appURL, message string) {
