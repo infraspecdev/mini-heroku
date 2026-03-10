@@ -10,7 +10,9 @@ type MockRunnerClient struct {
 	CreateConfig     ContainerConfig
 	CreateHostConfig HostConfig
 	StartCalled      bool
+	InspectCalled    bool
 	ContainerID      string
+	ContainerIP      string
 }
 
 func (m *MockRunnerClient) ContainerCreate(ctx context.Context, config ContainerConfig, hostConfig HostConfig) (ContainerCreateResponse, error) {
@@ -27,10 +29,19 @@ func (m *MockRunnerClient) ContainerStart(ctx context.Context, containerID strin
 	return nil
 }
 
+func (m *MockRunnerClient) ContainerInspect(ctx context.Context, containerID string) (ContainerInspectResponse, error) {
+	m.InspectCalled = true
+	m.ContainerIP = "172.17.0.2"
+
+	return ContainerInspectResponse{
+		IPAddress: m.ContainerIP,
+	}, nil
+}
+
 func TestRunContainer_Success(t *testing.T) {
 	mockClient := &MockRunnerClient{}
 
-	containerURL, err := RunContainer(mockClient, "my-app:latest", 8888)
+	result, err := RunContainer(mockClient, "my-app:latest", 8888)
 
 	if err != nil {
 		t.Fatalf("RunContainer failed: %v", err)
@@ -54,8 +65,20 @@ func TestRunContainer_Success(t *testing.T) {
 		t.Error("ContainerStart was not called")
 	}
 
-	expectedURL := "http://localhost:8888"
-	if containerURL != expectedURL {
-		t.Errorf("Expected URL %s, got %s", expectedURL, containerURL)
+	if !mockClient.InspectCalled {
+		t.Error("ContainerInspect was not called")
 	}
+
+	if result.ContainerID != "container-abc123" {
+		t.Errorf("Expected ContainerID container-abc123, got %s", result.ContainerID)
+	}
+
+	if result.ContainerIP != "172.17.0.2" {
+		t.Errorf("Expected ContainerIP 172.17.0.2, got %s", result.ContainerIP)
+	}
+
+	if result.HostPort != "8888" {
+		t.Errorf("Expected HostPort 8888, got %s", result.HostPort)
+	}
+	
 }
