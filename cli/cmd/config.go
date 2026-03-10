@@ -44,6 +44,27 @@ var setHostCmd = &cobra.Command{
 	},
 }
 
+// getHostCmd: `mini config get-host`
+var getHostCmd = &cobra.Command{
+	Use:   "get-host",
+	Short: "Print the current server URL",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.Load()
+		if err != nil {
+			return err
+		}
+
+		if cfg.ServerURL == "" {
+			fmt.Println("No host configured. Run: mini config set-host <url>")
+			return nil
+		}
+
+		fmt.Println(cfg.ServerURL)
+		return nil
+	},
+}
+
 func init() {
 	configCmd.AddCommand(setHostCmd)
+	configCmd.AddCommand(getHostCmd)
 }
