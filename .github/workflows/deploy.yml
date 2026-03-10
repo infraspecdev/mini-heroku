@@ -1,0 +1,172 @@
+name: Deploy Mini Heroku
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [controller, cli]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25.6"
+
+      - name: Run Tests
+        working-directory: ${{ matrix.module }}
+        run: go test -v ./...
+
+  build:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    needs: test # Only run if tests pass
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25.6"
+          cache: true
+          cache-dependency-path: |
+            controller/go.sum
+            cli/go.sum
+
+      - name: Build Controller
+        working-directory: controller
+        run: |
+          VERSION=$(git rev-parse --short HEAD)
+          BUILD_TIME=$(date -u +%Y-%m-%d_%H:%M:%S)
+
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" \
+            -o controller-linux -v
+
+      - name: Upload Controller Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: controller-binary
+          path: controller/controller-linux
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Private VM via VPN
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Controller Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: controller-binary
+
+      # ----------------------------- Setup WireGuard -----------------------------
+      - name: Setup WireGuard VPN
+        uses: egor-tensin/setup-wireguard@v1
+        with:
+          endpoint: ${{ secrets.WG_SERVER_ENDPOINT }}
+          endpoint_public_key: ${{ secrets.WG_SERVER_PUBLIC_KEY }}
+          private_key: ${{ secrets.WG_PRIVATE_KEY }}
+          ips: "${{ vars.VPN_CLIENT_IP }}/32"
+          allowed_ips: "${{ vars.TARGET_PRIVATE_IP }}/32"
+
+      # ----------------------------- Check WireGuard Connection -----------------------------
+      - name: Check WireGuard
+        run: sudo wg
+
+      # ----------------------------- Test SSH Connectivity -----------------------------
+      - name: Test SSH Connectivity
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.TARGET_PRIVATE_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Connected via VPN"
+            whoami
+
+      # ----------------------------- Copy Binary to VM -----------------------------
+      - name: Copy Controller Binary to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.TARGET_PRIVATE_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "controller-linux"
+          target: "/tmp"
+
+      - name: Copy systemd service file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.TARGET_PRIVATE_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: infra/systemd/mini-heroku.service
+          target: /tmp
+
+      # ----------------------------- Deploy and Restart Service -----------------------------
+      - name: Deploy and Restart Service
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.TARGET_PRIVATE_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "=== Starting Deployment ==="
+
+            sudo systemctl stop mini-heroku || true
+
+            # Backup binary
+            if [ -f /opt/mini-heroku/bin/controller ]; then
+              sudo cp /opt/mini-heroku/bin/controller \
+                /opt/mini-heroku/bin/controller.backup.$(date +%Y%m%d-%H%M%S)
+            fi
+
+            # Move new binary
+            sudo mv /tmp/controller-linux /opt/mini-heroku/bin/controller
+            sudo chown ubuntu:ubuntu /opt/mini-heroku/bin/controller
+            sudo chmod +x /opt/mini-heroku/bin/controller
+
+            # Install updated service file
+            sudo mv /tmp/mini-heroku.service /etc/systemd/system/mini-heroku.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable mini-heroku
+
+            sudo systemctl restart mini-heroku
+
+            echo "=== Deployment Complete ==="
+
+      # ----------------------------- Verify Deployment -----------------------------
+      - name: Verify Service Status
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.TARGET_PRIVATE_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "=== Verifying Service ==="
+
+            if sudo systemctl is-active --quiet mini-heroku; then
+              echo "Service is running"
+            else
+              echo "Service failed to start"
+              sudo journalctl -u mini-heroku -n 50 --no-pager
+              exit 1
+            fi
+
+            echo "=== Verification Successful ==="
