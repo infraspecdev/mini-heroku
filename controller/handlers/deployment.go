@@ -123,7 +123,7 @@ func UploadHandlerWithDocker(w http.ResponseWriter, r *http.Request, table *prox
 	}
 
 	// Build container target URL
-	targetURL := fmt.Sprintf("http://%s:8080", result.ContainerIP)
+	targetURL := fmt.Sprintf("http://127.0.0.1:%s", result.HostPort)
 
 	// Register route in proxy
 	table.Register(appName, targetURL)
