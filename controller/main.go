@@ -8,6 +8,7 @@ import (
 	"mini-heroku/controller/builder"
 	"mini-heroku/controller/handlers"
 	"mini-heroku/controller/runner"
+	"mini-heroku/controller/proxy"
 )
 
 func main() {
@@ -22,14 +23,20 @@ func main() {
 		log.Fatalf("Failed to create Docker runner client: %v", err)
 	}
 
+	// Create shared RouteTable
+	table := proxy.NewRouteTable()
+
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
 	// Register handlers
 	mux.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		handlers.UploadHandlerWithDocker(w, r, dockerBuilder, dockerRunner)
+		handlers.UploadHandlerWithDocker(w, r, table, dockerBuilder, dockerRunner)
 	})
 	mux.HandleFunc("/health", handlers.HealthHandler)
+
+	// Route registration endpoint
+	mux.HandleFunc("/register-route", handlers.RegisterRouteHandler(table))
 
 	// Wrap mux with custom 404 handler
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +47,17 @@ func main() {
 		}
 		mux.ServeHTTP(w, r)
 	})
+
+	// Start reverse proxy in separate goroutine
+	p := proxy.NewProxy(table)
+
+	go func() {
+		log.Println("[proxy] listening on :80")
+		err := http.ListenAndServe(":80", p)
+		if err != nil {
+			log.Fatalf("[proxy] error: %v", err)
+		}
+	}()
 
 	// Create and start server
 	server := &http.Server{
