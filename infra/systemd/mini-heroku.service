@@ -6,8 +6,9 @@ Requires=docker.service
 
 [Service]
 Type=simple
-User=ubuntu
-Group=ubuntu
+User=miniheroku
+Group=miniheroku
+
 WorkingDirectory=/opt/mini-heroku/bin
 ExecStart=/opt/mini-heroku/bin/controller
 Restart=on-failure
