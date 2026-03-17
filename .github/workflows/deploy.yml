@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/**
 
 jobs:
   test:
@@ -100,8 +101,8 @@ jobs:
             echo "Connected via VPN"
             whoami
 
-      # ----------------------------- Copy Binary to VM -----------------------------
-      - name: Copy Controller Binary to VM
+      # ----------------------------- Copy Files -----------------------------
+      - name: Copy Controller Binary
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ vars.TARGET_PRIVATE_IP }}
@@ -129,24 +130,53 @@ jobs:
           script: |
             echo "=== Starting Deployment ==="
 
+            # 1. Ensure service user exists
+            id -u miniheroku &>/dev/null || sudo useradd -r -s /bin/false miniheroku
+
+            # 2. Ensure directories
+            sudo mkdir -p /opt/mini-heroku/bin
+            sudo mkdir -p /opt/mini-heroku/data
+            sudo mkdir -p /opt/mini-heroku/logs
+
+            sudo chown -R miniheroku:miniheroku /opt/mini-heroku
+            sudo chmod -R 755 /opt/mini-heroku
+
+            # 3. Ensure docker access
+            sudo usermod -aG docker miniheroku
+
+            # 4. Stop service safely
             sudo systemctl stop mini-heroku || true
 
-            # Backup binary
+            # 5. Backup old binary
             if [ -f /opt/mini-heroku/bin/controller ]; then
               sudo cp /opt/mini-heroku/bin/controller \
                 /opt/mini-heroku/bin/controller.backup.$(date +%Y%m%d-%H%M%S)
             fi
 
-            # Move new binary
+            # 6. Move new binary
             sudo mv /tmp/controller-linux /opt/mini-heroku/bin/controller
-            sudo chown ubuntu:ubuntu /opt/mini-heroku/bin/controller
+            sudo chown miniheroku:miniheroku /opt/mini-heroku/bin/controller
             sudo chmod +x /opt/mini-heroku/bin/controller
 
-            # Install updated service file
+            # 7. Create environment file dynamically
+            sudo tee /etc/mini-heroku.env > /dev/null <<EOF
+            VM_PUBLIC_IP=${{ vars.VM_PUBLIC_IP }}
+            BASE_URL=${{ vars.BASE_URL }}
+            EOF
+
+            sudo chmod 644 /etc/mini-heroku.env
+
+            # 8. Install updated service file
             sudo mv /tmp/mini-heroku.service /etc/systemd/system/mini-heroku.service
+
+            # 9. Reload systemd
             sudo systemctl daemon-reload
             sudo systemctl enable mini-heroku
 
+            # 10. Reset failures
+            sudo systemctl reset-failed mini-heroku
+
+            # 11. Restart service
             sudo systemctl restart mini-heroku
 
             echo "=== Deployment Complete ==="
@@ -164,9 +194,12 @@ jobs:
             if sudo systemctl is-active --quiet mini-heroku; then
               echo "Service is running"
             else
-              echo "Service failed to start"
+              echo "Service failed"
               sudo journalctl -u mini-heroku -n 50 --no-pager
               exit 1
             fi
+
+            echo "--- Recent Logs ---"
+            sudo journalctl -u mini-heroku -n 20 --no-pager
 
             echo "=== Verification Successful ==="
