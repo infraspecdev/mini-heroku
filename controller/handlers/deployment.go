@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"mini-heroku/controller/builder"
 	"mini-heroku/controller/internal/logger"
 	"mini-heroku/controller/internal/store"
@@ -131,13 +130,18 @@ func UploadHandlerWithDocker(w http.ResponseWriter,
 		return
 	}
 
+	appLog.Info().
+		Str("container_id", result.ContainerID[:12]).
+		Str("container_ip", result.ContainerIP).
+		Str("host_port", result.HostPort).
+		Msg("container started")
+
 	// Build container target URL
 	targetURL := fmt.Sprintf("http://%s:8080", result.ContainerIP)
 
 	// Register route in proxy
 	table.Register(appName, targetURL)
-
-	log.Printf("[deploy] route registered: %s -> %s", appName, targetURL)
+	appLog.Info().Str("target", targetURL).Msg("route registered")
 
 	// Persist to DB (non-fatal if it fails — app IS running)
 	project, err := db.GetByName(appName)
@@ -152,7 +156,7 @@ func UploadHandlerWithDocker(w http.ResponseWriter,
 	project.Status = "running"
 
 	if err := db.Upsert(project); err != nil {
-		log.Printf("db upsert failed — app is running but state not persisted")
+		appLog.Warn().Err(err).Msg("db upsert failed — app is running but state not persisted")
 	}
 	// Build public URL
 	vmIP := os.Getenv("VM_PUBLIC_IP")
