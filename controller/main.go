@@ -104,7 +104,7 @@ func main() {
 	}
 
 	// Initialize SQLite store (mini.db in working directory)
-	db, err := store.NewStore("mini.db")
+	db, err := store.NewStore("/opt/mini-heroku/data/mini.db")
 	if err != nil {
 		logger.Log.Fatal().Err(err).Msg("store init failed")
 	}
