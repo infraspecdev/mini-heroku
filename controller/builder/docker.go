@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mini-heroku/controller/internal/logger"
 	"strings"
 )
 
@@ -42,6 +43,7 @@ func NewImageBuildOptions(appName string) ImageBuildOptions {
 
 func BuildImage(client DockerClient, tarballReader io.Reader, appName string) (string, error) {
 	options := NewImageBuildOptions(appName)
+	appLog := logger.AppLogger(appName)
 
 	resp, err := client.ImageBuild(context.Background(), tarballReader, options)
 
@@ -67,11 +69,11 @@ func BuildImage(client DockerClient, tarballReader io.Reader, appName string) (s
 
 		// Log build progress
 		if msg.Stream != "" {
-            msg.Stream = strings.TrimSpace(msg.Stream)
-            if msg.Stream != "" {
-                fmt.Printf("Build: %s\n", msg.Stream)
-            }
-        }
+			msg.Stream = strings.TrimSpace(msg.Stream)
+			if msg.Stream != "" {
+				appLog.Info().Str("stream", msg.Stream).Msg("build output")
+			}
+		}
 	}
 
 	if err := scanner.Err(); err != nil {

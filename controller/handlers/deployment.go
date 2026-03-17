@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"mini-heroku/controller/builder"
+	"mini-heroku/controller/internal/logger"
 	"mini-heroku/controller/internal/store"
 	"mini-heroku/controller/proxy"
 	"mini-heroku/controller/runner"
@@ -57,11 +58,11 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	sendSuccess(w, fmt.Sprintf("%s:%d", baseURL, HostPort), "App deployed successfully")
 }
 
-func UploadHandlerWithDocker(w http.ResponseWriter, 
-	r *http.Request, 
-	table *proxy.RouteTable, 
-	dockerBuilder builder.DockerClient, 
-	dockerRunner runner.RunnerClient, 
+func UploadHandlerWithDocker(w http.ResponseWriter,
+	r *http.Request,
+	table *proxy.RouteTable,
+	dockerBuilder builder.DockerClient,
+	dockerRunner runner.RunnerClient,
 	db *store.Store,
 ) {
 	// Validate method
@@ -117,7 +118,8 @@ func UploadHandlerWithDocker(w http.ResponseWriter,
 		return
 	}
 
-	log.Printf("[deploy] image built: %s", imageName)
+	appLog := logger.AppLogger(appName)
+	appLog.Info().Str("image", imageName).Msg("image built successfully")
 
 	// Generate host port
 	hostPort := runner.GenerateHostPort(appName)
@@ -137,7 +139,7 @@ func UploadHandlerWithDocker(w http.ResponseWriter,
 
 	log.Printf("[deploy] route registered: %s -> %s", appName, targetURL)
 
-		// Persist to DB (non-fatal if it fails — app IS running)
+	// Persist to DB (non-fatal if it fails — app IS running)
 	project, err := db.GetByName(appName)
 	if err != nil {
 		// Record not found → first deploy of this app

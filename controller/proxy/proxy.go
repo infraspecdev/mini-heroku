@@ -3,8 +3,8 @@ package proxy
 import (
 	"encoding/json"
 	"fmt"
-	"log"
-	
+	"mini-heroku/controller/internal/logger"
+
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -15,7 +15,7 @@ type Proxy struct {
 	table *RouteTable
 }
 
-func NewProxy (table *RouteTable) *Proxy {
+func NewProxy(table *RouteTable) *Proxy {
 	return &Proxy{table: table}
 }
 
@@ -32,26 +32,31 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	target,err := url.Parse(targetURL)
+	target, err := url.Parse(targetURL)
 	if err != nil {
 		sendJSON(w, http.StatusInternalServerError, "bad target URL")
 		return
 	}
 
-	log.Printf("[proxy] %s %s -> %s", r.Method, r.Host, targetURL)
+	appLog := logger.AppLogger(appName)
+	appLog.Info().
+		Str("method", r.Method).
+		Str("host", r.Host).
+		Str("target", targetURL).
+		Msg("proxy request")
 
 	rp := httputil.NewSingleHostReverseProxy(target)
 
 	rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		log.Printf("[proxy] error forwarding to %s: %v", targetURL, err)
+		appLog.Error().Err(err).Str("target", targetURL).Msg("error forwarding request")
 		sendJSON(w, http.StatusBadGateway, "could not reach container")
 	}
 
-	rp.ServeHTTP(w,r)
+	rp.ServeHTTP(w, r)
 }
 
-func extractAppName (host string) (string,error){
-	host=strings.Split(host, ":")[0]
+func extractAppName(host string) (string, error) {
+	host = strings.Split(host, ":")[0]
 
 	if host == "" {
 		return "", fmt.Errorf("empty host")
@@ -66,10 +71,8 @@ func extractAppName (host string) (string,error){
 	return appName, nil
 }
 
-func sendJSON (w http.ResponseWriter, status int, msg string) {
+func sendJSON(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
-
-
