@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,6 +12,83 @@ import (
 	"mini-heroku/controller/proxy"
 	"mini-heroku/controller/runner"
 )
+
+func reconcile(s *store.Store, runnerClient runner.RunnerClient, table *proxy.RouteTable) {
+	ctx := context.Background()
+
+	projects, err := s.ListAll()
+	if err != nil {
+		log.Printf("reconcile: db.ListAll failed: %v", err)
+		return
+	}
+
+	log.Printf("reconciliation started: count=%d", len(projects))
+	registered := 0
+
+	for i := range projects {
+		p := &projects[i]
+		prefix := fmt.Sprintf("[%s]", p.Name)
+
+		inspect, inspectErr := runnerClient.ContainerInspect(ctx, p.ContainerID)
+
+		if inspectErr == nil && inspect.Running {
+			// Container is already running
+			p.ContainerIP = inspect.IPAddress
+			log.Printf("%s container already running: id=%s", prefix, p.ContainerID[:12])
+
+		} else if inspectErr == nil && !inspect.Running {
+			// Container exists but is stopped
+			log.Printf("%s container stopped — restarting: id=%s", prefix, p.ContainerID[:12])
+
+			if err := runnerClient.ContainerStart(ctx, p.ContainerID); err != nil {
+				log.Printf("%s container restart failed: %v", prefix, err)
+				_ = s.UpdateStatus(p.Name, "error")
+				continue
+			}
+			// Re-inspect to get fresh IP after start
+			freshInspect, err := runnerClient.ContainerInspect(ctx, p.ContainerID)
+			if err != nil {
+				log.Printf("%s inspect after restart failed: %v", prefix, err)
+				_ = s.UpdateStatus(p.Name, "error")
+				continue
+			}
+
+			p.ContainerIP = freshInspect.IPAddress
+			p.Status = "running"
+			_ = s.Upsert(p)
+
+			log.Printf("%s container restarted: id=%s", prefix, p.ContainerID[:12])
+
+		} else {
+			log.Printf("%s container not found — creating new container: old_id=%s", prefix, p.ContainerID[:12])
+
+			var hostPortInt int
+			fmt.Sscanf(p.HostPort, "%d", &hostPortInt)
+
+			result, err := runner.RunContainer(runnerClient, p.ImageName, hostPortInt)
+			if err != nil {
+				log.Printf("%s container creation failed: %v", prefix, err)
+				_ = s.UpdateStatus(p.Name, "error")
+				continue
+			}
+
+			p.ContainerID = result.ContainerID
+			p.ContainerIP = result.ContainerIP
+			p.Status = "running"
+			_ = s.Upsert(p)
+
+			log.Printf("%s new container created: id=%s", prefix, result.ContainerID[:12])
+		}
+
+		targetURL := fmt.Sprintf("http://localhost:%s", p.HostPort)
+		table.Register(p.Name, targetURL)
+		registered++
+
+		log.Printf("%s route registered: target=%s", prefix, targetURL)
+	}
+
+	log.Printf("reconciliation complete: registered=%d", registered)
+}
 
 func main() {
 	// Initialize real Docker clients
@@ -35,6 +113,9 @@ func main() {
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()
+
+	// Reconcile: rebuild proxy routes from DB before accepting requests
+	reconcile(db, dockerRunner, table)
 
 	// Register handlers
 	mux.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {

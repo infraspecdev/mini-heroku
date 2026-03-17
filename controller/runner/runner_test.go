@@ -15,6 +15,16 @@ type MockRunnerClient struct {
 	ContainerIP      string
 }
 
+// ContainerRemove implements [RunnerClient].
+func (m *MockRunnerClient) ContainerRemove(ctx context.Context, containerID string) error {
+	panic("unimplemented")
+}
+
+// ContainerStop implements [RunnerClient].
+func (m *MockRunnerClient) ContainerStop(ctx context.Context, containerID string) error {
+	panic("unimplemented")
+}
+
 func (m *MockRunnerClient) ContainerCreate(ctx context.Context, config ContainerConfig, hostConfig HostConfig) (ContainerCreateResponse, error) {
 	m.CreateCalled = true
 	m.CreateConfig = config
@@ -80,5 +90,5 @@ func TestRunContainer_Success(t *testing.T) {
 	if result.HostPort != "8888" {
 		t.Errorf("Expected HostPort 8888, got %s", result.HostPort)
 	}
-	
+
 }
