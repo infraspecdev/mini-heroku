@@ -7,8 +7,9 @@ import (
 
 	"mini-heroku/controller/builder"
 	"mini-heroku/controller/handlers"
-	"mini-heroku/controller/runner"
+	"mini-heroku/controller/internal/store"
 	"mini-heroku/controller/proxy"
+	"mini-heroku/controller/runner"
 )
 
 func main() {
@@ -23,6 +24,12 @@ func main() {
 		log.Fatalf("Failed to create Docker runner client: %v", err)
 	}
 
+	// Initialize SQLite store (mini.db in working directory)
+	db, err := store.NewStore("mini.db")
+	if err != nil {
+		log.Fatalf("store init: %v", err)
+	}
+
 	// Create shared RouteTable
 	table := proxy.NewRouteTable()
 
@@ -31,8 +38,9 @@ func main() {
 
 	// Register handlers
 	mux.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		handlers.UploadHandlerWithDocker(w, r, table, dockerBuilder, dockerRunner)
+		handlers.UploadHandlerWithDocker(w, r, table, dockerBuilder, dockerRunner, db)
 	})
+
 	mux.HandleFunc("/health", handlers.HealthHandler)
 
 	// Route registration endpoint
