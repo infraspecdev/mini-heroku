@@ -3,7 +3,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os"
 )
 
 type ContainerConfig struct {
@@ -26,6 +25,7 @@ type ContainerCreateResponse struct {
 
 type ContainerInspectResponse struct {
 	IPAddress string
+	Running   bool
 }
 
 type RunResult struct {
@@ -37,6 +37,8 @@ type RunResult struct {
 type RunnerClient interface {
 	ContainerCreate(ctx context.Context, config ContainerConfig, hostConfig HostConfig) (ContainerCreateResponse, error)
 	ContainerStart(ctx context.Context, containerID string) error
+	ContainerStop(ctx context.Context, containerID string) error
+	ContainerRemove(ctx context.Context, containerID string) error
 	ContainerInspect(ctx context.Context, containerID string) (ContainerInspectResponse, error)
 }
 
