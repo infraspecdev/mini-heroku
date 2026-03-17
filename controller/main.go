@@ -88,6 +88,10 @@ func reconcile(s *store.Store,
 }
 
 func main() {
+
+	// Initialize structured logger
+	logger.Init()
+	
 	// Initialize real Docker clients
 	dockerBuilder, err := builder.NewRealDockerClient()
 	if err != nil {
