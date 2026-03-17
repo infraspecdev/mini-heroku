@@ -22,5 +22,9 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 
+# Allow DB + logs write
+ReadWritePaths=/opt/mini-heroku/data
+ReadWritePaths=/opt/mini-heroku/logs
+
 [Install]
 WantedBy=multi-user.target
