@@ -120,6 +120,15 @@ func UploadHandlerWithDocker(w http.ResponseWriter,
 	appLog := logger.AppLogger(appName)
 	appLog.Info().Str("image", imageName).Msg("image built successfully")
 
+	// If this app was previously deployed, stop and remove the old container first
+	if existing, err := db.GetByName(appName); err == nil {
+		appLog.Info().Str("container_id", existing.ContainerID[:12]).Msg("stopping old container")
+		_ = dockerRunner.ContainerStop(r.Context(), existing.ContainerID)
+		if err := dockerRunner.ContainerRemove(r.Context(), existing.ContainerID); err != nil {
+			appLog.Warn().Err(err).Msg("could not remove old container — continuing anyway")
+		}
+	}
+	
 	// Generate host port
 	hostPort := runner.GenerateHostPort(appName)
 
