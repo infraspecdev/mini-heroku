@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"mini-heroku/controller/builder"
-	"mini-heroku/controller/runner"
+	"mini-heroku/controller/internal/logger"
+	"mini-heroku/controller/internal/store"
 	"mini-heroku/controller/proxy"
+	"mini-heroku/controller/runner"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -56,7 +57,13 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	sendSuccess(w, fmt.Sprintf("%s:%d", baseURL, HostPort), "App deployed successfully")
 }
 
-func UploadHandlerWithDocker(w http.ResponseWriter, r *http.Request, table *proxy.RouteTable, dockerBuilder builder.DockerClient, dockerRunner runner.RunnerClient) {
+func UploadHandlerWithDocker(w http.ResponseWriter,
+	r *http.Request,
+	table *proxy.RouteTable,
+	dockerBuilder builder.DockerClient,
+	dockerRunner runner.RunnerClient,
+	db *store.Store,
+) {
 	// Validate method
 	if r.Method != http.MethodPost {
 		sendError(w, http.StatusMethodNotAllowed, "Only POST allowed")
@@ -110,8 +117,18 @@ func UploadHandlerWithDocker(w http.ResponseWriter, r *http.Request, table *prox
 		return
 	}
 
-	log.Printf("[deploy] image built: %s", imageName)
+	appLog := logger.AppLogger(appName)
+	appLog.Info().Str("image", imageName).Msg("image built successfully")
 
+	// If this app was previously deployed, stop and remove the old container first
+	if existing, err := db.GetByName(appName); err == nil {
+		appLog.Info().Str("container_id", existing.ContainerID[:12]).Msg("stopping old container")
+		_ = dockerRunner.ContainerStop(r.Context(), existing.ContainerID)
+		if err := dockerRunner.ContainerRemove(r.Context(), existing.ContainerID); err != nil {
+			appLog.Warn().Err(err).Msg("could not remove old container — continuing anyway")
+		}
+	}
+	
 	// Generate host port
 	hostPort := runner.GenerateHostPort(appName)
 
@@ -122,14 +139,34 @@ func UploadHandlerWithDocker(w http.ResponseWriter, r *http.Request, table *prox
 		return
 	}
 
+	appLog.Info().
+		Str("container_id", result.ContainerID[:12]).
+		Str("container_ip", result.ContainerIP).
+		Str("host_port", result.HostPort).
+		Msg("container started")
+
 	// Build container target URL
-	targetURL := fmt.Sprintf("http://127.0.0.1:%s", result.HostPort)
+	targetURL := fmt.Sprintf("http://%s:8080", result.ContainerIP)
 
 	// Register route in proxy
 	table.Register(appName, targetURL)
+	appLog.Info().Str("target", targetURL).Msg("route registered")
 
-	log.Printf("[deploy] route registered: %s -> %s", appName, targetURL)
+	// Persist to DB (non-fatal if it fails — app IS running)
+	project, err := db.GetByName(appName)
+	if err != nil {
+		// Record not found → first deploy of this app
+		project = &store.Project{Name: appName}
+	}
+	project.ContainerID = result.ContainerID
+	project.ContainerIP = result.ContainerIP
+	project.HostPort = result.HostPort
+	project.ImageName = imageName
+	project.Status = "running"
 
+	if err := db.Upsert(project); err != nil {
+		appLog.Warn().Err(err).Msg("db upsert failed — app is running but state not persisted")
+	}
 	// Build public URL
 	vmIP := os.Getenv("VM_PUBLIC_IP")
 	if vmIP == "" {

@@ -70,6 +70,15 @@ func (r *RealRunnerClient) ContainerStart(ctx context.Context, containerID strin
 	return r.client.ContainerStart(ctx, containerID, container.StartOptions{})
 }
 
+func (r *RealRunnerClient) ContainerStop(ctx context.Context, containerID string) error {
+	return r.client.ContainerStop(ctx, containerID, container.StopOptions{})
+}
+
+func (r *RealRunnerClient) ContainerRemove(ctx context.Context, containerID string) error {
+	return r.client.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
+}
+
+
 func (r *RealRunnerClient) ContainerInspect(ctx context.Context, containerID string) (ContainerInspectResponse, error) {
 
 	inspect, err := r.client.ContainerInspect(ctx, containerID)
@@ -89,7 +98,11 @@ func (r *RealRunnerClient) ContainerInspect(ctx context.Context, containerID str
 		}
 	}
 
+
+	running := inspect.State != nil && inspect.State.Running
+	
 	return ContainerInspectResponse{
-		IPAddress: ip,
-	}, nil
+			IPAddress: ip,
+			Running:   running,
+		}, nil
 }
