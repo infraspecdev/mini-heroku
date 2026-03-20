@@ -132,6 +132,8 @@ func main() {
 	// Route registration endpoint
 	mux.HandleFunc("/register-route", handlers.RegisterRouteHandler(table))
 
+	mux.HandleFunc("/apps/", handlers.LogsHandler(db, dockerRunner))
+
 	// Wrap mux with custom 404 handler
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pattern := mux.Handler(r)
