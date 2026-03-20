@@ -30,9 +30,6 @@ go.work.sum
 # database file
 *.db
 
-# database file
-*.db
-
 # Editor/IDE
 # .idea/
 # .vscode/
