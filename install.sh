@@ -6,11 +6,16 @@ REPO="infraspecdev/mini-heroku"
 BINARY="mini"
 
 OS=$(uname -s)
+ARCH=$(uname -m)
 
 if [ "$OS" = "Linux" ]; then
     FILE="mini-linux-amd64"
 elif [ "$OS" = "Darwin" ]; then
-    FILE="mini-darwin-amd64"
+    if [ "$ARCH" = "arm64" ]; then
+        FILE="mini-darwin-arm64"
+    else
+        FILE="mini-darwin-amd64"
+    fi
 else
     echo "Unsupported OS"
     exit 1
