@@ -1,0 +1,73 @@
+name: Release CLI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  test:
+    name: Test CLI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25.6"
+
+      - name: Run Tests
+        working-directory: cli
+        run: go test -v ./...
+
+  build-and-release:
+    name: Build and Release CLI Binaries
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25.6"
+          cache: true
+          cache-dependency-path: cli/go.sum
+
+      - name: Build CLI Binaries
+        working-directory: cli
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-X mini-heroku/cli/cmd.Version=${VERSION}" \
+            -o mini-linux-amd64
+
+          GOOS=darwin GOARCH=arm64 go build \
+            -ldflags="-X mini-heroku/cli/cmd.Version=${VERSION}" \
+            -o mini-darwin-arm64
+
+          GOOS=darwin GOARCH=amd64 go build \
+            -ldflags="-X mini-heroku/cli/cmd.Version=${VERSION}" \
+            -o mini-darwin-amd64
+            
+          GOOS=windows GOARCH=amd64 go build \
+            -ldflags="-X mini-heroku/cli/cmd.Version=${VERSION}" \
+            -o mini-windows-amd64.exe
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            cli/mini-linux-amd64
+            cli/mini-darwin-arm64
+            cli/mini-darwin-amd64
+            cli/mini-windows-amd64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
