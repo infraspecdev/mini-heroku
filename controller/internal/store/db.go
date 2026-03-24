@@ -7,6 +7,14 @@ import (
 	"gorm.io/gorm"
 )
 
+// StoreClient defines the database interface for projects
+type StoreClient interface {
+	GetByName(name string) (*Project, error)
+	Upsert(*Project) error
+	ListAll() ([]Project, error)
+	UpdateStatus(name, status string) error
+}
+
 type Store struct {
 	db *gorm.DB
 }

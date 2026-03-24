@@ -24,4 +24,5 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(logsCmd)
 }
