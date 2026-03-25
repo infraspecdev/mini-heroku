@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"mini-heroku/cli/client"
 	"mini-heroku/cli/config"
 
 	"github.com/spf13/cobra"
@@ -31,6 +32,10 @@ func runLogs(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
+	if cfg.APIKey == "" {
+		return fmt.Errorf("no API key configured — run: mini config set-api-key <key>")
+	}
+
 	host := cfg.ServerURL
 	if host == "" {
 		host = "http://localhost:8080"
@@ -42,6 +47,8 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("building request: %w", err)
 	}
+
+	req.Header.Set(client.HeaderAPIKey, cfg.APIKey)
 
 	httpClient := &http.Client{}
 
