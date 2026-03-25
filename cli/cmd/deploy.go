@@ -12,60 +12,58 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 var deployCmd = &cobra.Command{
 	Use:   "deploy [folder] [app-name]",
 	Short: "Deploy an application to the mini platform",
 	Args: cobra.ExactArgs(2),
 
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		folder := args[0]
 		appName := args[1]
 
-		cfg, err:=config.Load()
-		if err != nil{
-			fmt.Println("Failed to load config:", err)
-			return
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("loading config: %w", err)
 		}
 
-		host := cfg.ServerURL
-		if host == ""{
+		serverURL := cfg.ServerURL
+		if serverURL == "" {
 			fmt.Println("Controller host not configured")
 			fmt.Println("Run: mini config set-host <url>")
-			return
+			return nil
 		}
 
+		if cfg.APIKey == "" {
+			return fmt.Errorf("no API key configured — run: mini config set-api-key <key>")
+		}
 
 		fmt.Println("Discovering files...")
 
 		files, err := packager.ExploreDirectory(folder)
-		if err != nil{
-			fmt.Println("Failed to explore directory:", err)
-			return
+		if err != nil {
+			return fmt.Errorf("exploring directory: %w", err)
 		}
 
 		fmt.Printf("Found %d files\n", len(files))
 
 		fileMap := make(map[string]string)
 
-		for _,f := range files {
-			fullPath := filepath.Join(folder,f)
+		for _, f := range files {
+			fullPath := filepath.Join(folder, f)
 
 			data, err := os.ReadFile(fullPath)
 			if err != nil {
-				fmt.Println("Failed to read file:", f)
-				return
+				return fmt.Errorf("reading file %s: %w", f, err)
 			}
 
-			fileMap[f]=string(data)
+			fileMap[f] = string(data)
 		}
 
 		fmt.Println("Creating archive...")
 
 		tarball, err := packager.CreateTarball(fileMap)
 		if err != nil {
-			fmt.Println("Failed to create tarball:", err)
-			return
+			return fmt.Errorf("creating tarball: %w", err)
 		}
 
 		fmt.Printf("Archive size: %d bytes\n", len(tarball))
@@ -74,10 +72,9 @@ var deployCmd = &cobra.Command{
 
 		reader := bytes.NewReader(tarball)
 
-		resp, err := client.UploadPackage(host, reader, appName)
-		if err != nil{
-			fmt.Println("Deployment failed:", err)
-			return
+		resp, err := client.UploadPackage(serverURL, reader, appName, cfg.APIKey)
+		if err != nil {
+			return fmt.Errorf("deployment failed: %w", err)
 		}
 
 		fmt.Println("")
@@ -87,6 +84,8 @@ var deployCmd = &cobra.Command{
 		if resp.AppURL != "" {
 			fmt.Println("App URL:", resp.AppURL)
 		}
+
+		return nil
 	},
 }
 

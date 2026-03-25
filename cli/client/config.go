@@ -9,6 +9,7 @@ const (
 	// HTTP Headers
 	HeaderContentType = "Content-Type"
 	HeaderAppName     = "App-Name"
+	HeaderAPIKey      = "X-API-Key"
 
 	// Content Types
 	ContentTypeGzip = "application/x-gzip"

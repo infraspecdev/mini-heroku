@@ -7,11 +7,16 @@ import (
 	"net/http"
 )
 
-func UploadPackage(serverURL string, tarballReader io.Reader, appName string) (*DeploymentResponse, error) {
+func UploadPackage(serverURL string, tarballReader io.Reader, appName string, apiKey string) (*DeploymentResponse, error) {
+
 	// Create request
 	req, err := http.NewRequest("POST", serverURL+UploadEndpoint, tarballReader)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	if apiKey != "" {
+		req.Header.Set(HeaderAPIKey, apiKey)
 	}
 
 	// Set headers
@@ -27,6 +32,10 @@ func UploadPackage(serverURL string, tarballReader io.Reader, appName string) (*
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("unauthorized: run `mini config set-api-key <key>` to configure your API key")
+	}
 
 	// Parse response
 	var deployResp DeploymentResponse
