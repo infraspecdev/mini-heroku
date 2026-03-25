@@ -1,10 +1,10 @@
 package auth_test
 
 import (
+	"mini-heroku/controller/internal/auth"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"mini-heroku/controller/internal/auth"
 )
 
 func TestRequireAPIKey_ValidKey(t *testing.T) {
