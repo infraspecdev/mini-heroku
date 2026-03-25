@@ -9,7 +9,8 @@ import (
 
 // Config holds all user-level CLI settings.
 type Config struct {
-	ServerURL string `json:"server_url"`
+    ServerURL string `json:"server_url"`
+    APIKey    string `json:"api_key,omitempty"`
 }
 
 // configPath returns the path to ~/.mini/config.json
