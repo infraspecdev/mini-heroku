@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"mini-heroku/cli/config"
 
@@ -20,7 +21,10 @@ var setAPIKeyCmd = &cobra.Command{
 	Short: "Save your API key to local config",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		key := args[0]
+		key := strings.TrimSpace(args[0])
+		if key == "" {
+			return fmt.Errorf("API key cannot be empty")
+		}
 
 		cfg, err := config.Load()
 		if err != nil {
