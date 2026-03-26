@@ -126,10 +126,20 @@ jobs:
       # ----------------------------- Deploy and Restart Service -----------------------------
       - name: Deploy and Restart Service
         uses: appleboy/ssh-action@v1
+
+        env:
+          VM_PUBLIC_IP: ${{ secrets.VM_PUBLIC_IP }}
+          BASE_URL: ${{ secrets.BASE_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
+
         with:
           host: ${{ vars.TARGET_PRIVATE_IP }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+          # Pass variables into remote shell
+          envs: VM_PUBLIC_IP,BASE_URL,API_KEY
+
           script: |
             echo "=== Starting Deployment ==="
 
@@ -161,25 +171,26 @@ jobs:
             sudo chown miniheroku:miniheroku /opt/mini-heroku/bin/controller
             sudo chmod +x /opt/mini-heroku/bin/controller
 
-            # 7. Create environment file dynamically
-            sudo tee /etc/mini-heroku.env > /dev/null <<EOF
-            VM_PUBLIC_IP=${{ vars.VM_PUBLIC_IP }}
-            BASE_URL=${{ vars.BASE_URL }}
-            EOF
+            # ----------------------------- Create ENV File -----------------------------
+            sudo bash -c "cat > /etc/mini-heroku.env <<EOF
+            VM_PUBLIC_IP=${VM_PUBLIC_IP}
+            BASE_URL=${BASE_URL}
+            API_KEY=${API_KEY}
+            EOF"
 
-            sudo chmod 644 /etc/mini-heroku.env
+            # Secure permissions
+            sudo chmod 600 /etc/mini-heroku.env
 
-            # 8. Install updated service file
+            # Safe verification
+            echo "--- Verifying env file ---"
+            sudo test -s /etc/mini-heroku.env && echo "Env file created successfully"
+
+            # ----------------------------- Systemd -----------------------------
             sudo mv /tmp/mini-heroku.service /etc/systemd/system/mini-heroku.service
 
-            # 9. Reload systemd
             sudo systemctl daemon-reload
             sudo systemctl enable mini-heroku
-
-            # 10. Reset failures
             sudo systemctl reset-failed mini-heroku
-
-            # 11. Restart service
             sudo systemctl restart mini-heroku
 
             echo "=== Deployment Complete ==="
