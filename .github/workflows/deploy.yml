@@ -119,8 +119,9 @@ jobs:
           host: ${{ vars.TARGET_PRIVATE_IP }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: infra/systemd/mini-heroku.service
-          target: /tmp
+          source: "infra/systemd/mini-heroku.service"
+          target: "/tmp"
+          strip_components: 2
 
       # ----------------------------- Deploy and Restart Service -----------------------------
       - name: Deploy and Restart Service
