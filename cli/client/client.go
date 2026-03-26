@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 func UploadPackage(serverURL string, tarballReader io.Reader, appName string, apiKey string) (*DeploymentResponse, error) {
@@ -33,13 +34,23 @@ func UploadPackage(serverURL string, tarballReader io.Reader, appName string, ap
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, fmt.Errorf("unauthorized: run `mini config set-api-key <key>` to configure your API key")
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
 	}
 
-	// Parse response
+	if resp.StatusCode != http.StatusOK {
+		var errResp DeploymentResponse
+		if json.Unmarshal(body, &errResp) == nil && errResp.Message != "" {
+			return nil, fmt.Errorf("controller returned %d: %s", resp.StatusCode, errResp.Message)
+		}
+
+		return nil, fmt.Errorf("controller returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	// Parse success response
 	var deployResp DeploymentResponse
-	if err := json.NewDecoder(resp.Body).Decode(&deployResp); err != nil {
+	if err := json.Unmarshal(body, &deployResp); err != nil {
 		return nil, fmt.Errorf("parsing response: %w", err)
 	}
 
