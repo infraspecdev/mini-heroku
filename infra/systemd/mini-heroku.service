@@ -9,6 +9,9 @@ Type=simple
 User=miniheroku
 Group=miniheroku
 
+# Load controller configuration
+EnvironmentFile=/etc/mini-heroku.env
+
 WorkingDirectory=/opt/mini-heroku/bin
 ExecStart=/opt/mini-heroku/bin/controller
 Restart=on-failure
