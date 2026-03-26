@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"mini-heroku/cli/client"
 	"mini-heroku/cli/config"
@@ -58,10 +60,20 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	}
 	defer resp.Body.Close()
 
-	// Surface controller-side errors cleanly.
+	// Surface controller-side errors cleanly (avoid dumping raw JSON).
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("controller returned %d: %s", resp.StatusCode, string(body))
+
+		var errResp struct {
+			Message string `json:"message"`
+			Status  string `json:"status"`
+		}
+
+		if json.Unmarshal(body, &errResp) == nil && errResp.Message != "" {
+			return fmt.Errorf("controller returned %d: %s", resp.StatusCode, errResp.Message)
+		}
+
+		return fmt.Errorf("controller returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	fmt.Fprintf(os.Stderr, "=== logs for %s (Ctrl-C to stop) ===\n", appName)
