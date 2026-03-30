@@ -13,12 +13,14 @@ func TestUploadPackage(t *testing.T) {
 	var receivedMethod string
 	var receivedContentType string
 	var receivedAppName string
+	var receivedAPIKey string
 	var receivedBody []byte
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedContentType = r.Header.Get(HeaderContentType)
 		receivedAppName = r.Header.Get(HeaderAppName)
+		receivedAPIKey = r.Header.Get(HeaderAPIKey)
 		receivedBody, _ = io.ReadAll(r.Body)
 
 		// Respond with success
@@ -34,7 +36,7 @@ func TestUploadPackage(t *testing.T) {
 
 	// Execute: Upload dummy tarball
 	tarballData := []byte("fake-tarball-data")
-	response, err := UploadPackage(server.URL, bytes.NewReader(tarballData), "test-app")
+	response, err := UploadPackage(server.URL, bytes.NewReader(tarballData), "test-app", "secret-key")
 
 	// Assert: Request was correct
 	if err != nil {
@@ -51,6 +53,10 @@ func TestUploadPackage(t *testing.T) {
 
 	if receivedAppName != "test-app" {
 		t.Errorf("Expected test-app, got %s", receivedAppName)
+	}
+
+	if receivedAPIKey != "secret-key" {
+		t.Errorf("Expected API key secret-key, got %s", receivedAPIKey)
 	}
 
 	if !bytes.Equal(receivedBody, tarballData) {
@@ -74,6 +80,10 @@ func TestUploadPackageWithoutAppName(t *testing.T) {
 			t.Error("Expected no app name header")
 		}
 
+		if r.Header.Get(HeaderAPIKey) != "another-key" {
+			t.Error("Expected API key header to be set")
+		}
+
 		w.Header().Set(HeaderContentType, ContentTypeJSON)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status": "success", "appUrl": "http://localhost:8888", "message": "OK"}`))
@@ -81,7 +91,7 @@ func TestUploadPackageWithoutAppName(t *testing.T) {
 	defer server.Close()
 
 	tarballData := []byte("data")
-	response, err := UploadPackage(server.URL, bytes.NewReader(tarballData), "")
+	response, err := UploadPackage(server.URL, bytes.NewReader(tarballData), "", "another-key")
 
 	if err != nil {
 		t.Fatalf("Upload failed: %v", err)

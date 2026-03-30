@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 
 	"mini-heroku/controller/builder"
 	"mini-heroku/controller/handlers"
+	"mini-heroku/controller/internal/auth"
 	"mini-heroku/controller/internal/logger"
 	"mini-heroku/controller/internal/store"
 	"mini-heroku/controller/proxy"
@@ -91,7 +93,13 @@ func main() {
 
 	// Initialize structured logger
 	logger.Init()
-	
+
+	apiKey := os.Getenv("API_KEY")
+	if apiKey == "" {
+		logger.Log.Warn().Msg("API_KEY env var not set — all protected routes will reject requests")
+	}
+	authSvc := auth.New(apiKey)
+
 	// Initialize real Docker clients
 	dockerBuilder, err := builder.NewRealDockerClient()
 	if err != nil {
@@ -123,17 +131,20 @@ func main() {
 	reconcile(db, dockerRunner, table)
 
 	// Register handlers
-	mux.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/upload", auth.RequireAPIKey(authSvc, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlers.UploadHandlerWithDocker(w, r, table, dockerBuilder, dockerRunner, db)
-	})
+	})))
 
 	mux.HandleFunc("/health", handlers.HealthHandler)
 
 	// Route registration endpoint
-	mux.HandleFunc("/register-route", handlers.RegisterRouteHandler(table))
-
-	mux.HandleFunc("/apps/", handlers.LogsHandler(db, dockerRunner))
-
+	mux.Handle("/register-route", auth.RequireAPIKey(authSvc,
+		http.HandlerFunc(handlers.RegisterRouteHandler(table)),
+	))
+	
+	mux.Handle("/apps/", auth.RequireAPIKey(authSvc,
+		http.HandlerFunc(handlers.LogsHandler(db, dockerRunner)),
+	))
 	// Wrap mux with custom 404 handler
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pattern := mux.Handler(r)

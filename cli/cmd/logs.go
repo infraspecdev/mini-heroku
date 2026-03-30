@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
+	"mini-heroku/cli/client"
 	"mini-heroku/cli/config"
 
 	"github.com/spf13/cobra"
@@ -31,6 +34,10 @@ func runLogs(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
+	if cfg.APIKey == "" {
+		return fmt.Errorf("no API key configured — run: mini config set-api-key <key>")
+	}
+
 	host := cfg.ServerURL
 	if host == "" {
 		host = "http://localhost:8080"
@@ -43,6 +50,8 @@ func runLogs(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("building request: %w", err)
 	}
 
+	req.Header.Set(client.HeaderAPIKey, cfg.APIKey)
+
 	httpClient := &http.Client{}
 
 	resp, err := httpClient.Do(req)
@@ -51,10 +60,20 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	}
 	defer resp.Body.Close()
 
-	// Surface controller-side errors cleanly.
+	// Surface controller-side errors cleanly (avoid dumping raw JSON).
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("controller returned %d: %s", resp.StatusCode, string(body))
+
+		var errResp struct {
+			Message string `json:"message"`
+			Status  string `json:"status"`
+		}
+
+		if json.Unmarshal(body, &errResp) == nil && errResp.Message != "" {
+			return fmt.Errorf("controller returned %d: %s", resp.StatusCode, errResp.Message)
+		}
+
+		return fmt.Errorf("controller returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	fmt.Fprintf(os.Stderr, "=== logs for %s (Ctrl-C to stop) ===\n", appName)
