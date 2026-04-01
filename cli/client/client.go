@@ -6,29 +6,24 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"mini-heroku/cli/signer"
 )
 
-func UploadPackage(serverURL string, tarballReader io.Reader, appName string, apiKey string) (*DeploymentResponse, error) {
-
-	// Create request
-	req, err := http.NewRequest("POST", serverURL+UploadEndpoint, tarballReader)
+// UploadPackage POSTs a signed tarball to the controller's /upload endpoint.
+func UploadPackage(serverURL string, tarballReader io.Reader, appName, apiKey string) (*DeploymentResponse, error) {
+	req, err := http.NewRequest(http.MethodPost, serverURL+UploadEndpoint, tarballReader)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	if apiKey != "" {
-		req.Header.Set(HeaderAPIKey, apiKey)
-	}
-
-	// Set headers
 	req.Header.Set(HeaderContentType, ContentTypeGzip)
 	if appName != "" {
 		req.Header.Set(HeaderAppName, appName)
 	}
+	attachAuth(req, apiKey)
 
-	// Send request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := (&http.Client{}).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -44,15 +39,32 @@ func UploadPackage(serverURL string, tarballReader io.Reader, appName string, ap
 		if json.Unmarshal(body, &errResp) == nil && errResp.Message != "" {
 			return nil, fmt.Errorf("controller returned %d: %s", resp.StatusCode, errResp.Message)
 		}
-
 		return nil, fmt.Errorf("controller returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	// Parse success response
 	var deployResp DeploymentResponse
 	if err := json.Unmarshal(body, &deployResp); err != nil {
 		return nil, fmt.Errorf("parsing response: %w", err)
 	}
-
 	return &deployResp, nil
+}
+
+func NewSignedRequest(method, url, apiKey string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+	attachAuth(req, apiKey)
+	return req, nil
+}
+
+// attachAuth adds the API key header plus HMAC signing headers to req.
+func attachAuth(req *http.Request, apiKey string) {
+	if apiKey == "" {
+		return
+	}
+	req.Header.Set(HeaderAPIKey, apiKey)
+	for k, v := range signer.Headers(apiKey, req.Method, req.URL.Path) {
+		req.Header.Set(k, v)
+	}
 }
