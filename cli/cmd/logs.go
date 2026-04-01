@@ -41,11 +41,13 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	}
 
 	url := fmt.Sprintf("%s/apps/%s/logs", host, appName)
-	req, err := http.NewRequestWithContext(cmd.Context(), http.MethodGet, url, nil)
+
+	// Use signed request so the controller can verify HMAC + timestamp.
+	req, err := client.NewSignedRequest(http.MethodGet, url, apiKey, nil)
 	if err != nil {
 		return fmt.Errorf("building request: %w", err)
 	}
-	req.Header.Set(client.HeaderAPIKey, apiKey)
+	req = req.WithContext(cmd.Context())
 
 	resp, err := (&http.Client{}).Do(req)
 	if err != nil {

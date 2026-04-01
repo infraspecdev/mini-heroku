@@ -1,6 +1,7 @@
 package signer_test
 
 import (
+	"mini-heroku/cli/signer"
 	"strconv"
 	"testing"
 	"time"
