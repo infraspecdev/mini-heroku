@@ -1,9 +1,11 @@
-package ratelimit
+package ratelimit_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"mini-heroku/controller/internal/ratelimit"
 )
 
 func okHandler() http.Handler {
