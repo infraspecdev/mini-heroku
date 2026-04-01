@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"mini-heroku/cli/config"
+	"mini-heroku/cli/keychain"
 
 	"github.com/spf13/cobra"
 )
 
-// configCmd is the parent: `mini config`
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage CLI configuration",
@@ -18,60 +18,43 @@ var configCmd = &cobra.Command{
 
 var setAPIKeyCmd = &cobra.Command{
 	Use:   "set-api-key <key>",
-	Short: "Save your API key to local config",
+	Short: "Save your API key to the OS keychain",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := strings.TrimSpace(args[0])
 		if key == "" {
 			return fmt.Errorf("API key cannot be empty")
 		}
-
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("loading config: %w", err)
+		if err := keychain.Set(key); err != nil {
+			return fmt.Errorf("storing API key: %w", err)
 		}
-
-		cfg.APIKey = key
-
-		if err := config.Save(cfg); err != nil {
-			return fmt.Errorf("saving config: %w", err)
-		}
-
-		fmt.Println("API key saved to ~/.mini/config.json")
+		fmt.Println("API key saved to OS keychain")
 		return nil
 	},
 }
 
-// setHostCmd: `mini config set-host <url>`
 var setHostCmd = &cobra.Command{
 	Use:   "set-host <url>",
 	Short: "Set the controller server URL",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		rawURL := args[0]
-
-		// Validate the URL before saving
 		if _, err := url.ParseRequestURI(rawURL); err != nil {
 			return fmt.Errorf("invalid URL %q: %w", rawURL, err)
 		}
-
 		cfg, err := config.Load()
 		if err != nil {
 			return err
 		}
-
 		cfg.ServerURL = rawURL
-
 		if err := config.Save(cfg); err != nil {
 			return err
 		}
-
 		fmt.Printf("Host set to: %s\n", rawURL)
 		return nil
 	},
 }
 
-// getHostCmd: `mini config get-host`
 var getHostCmd = &cobra.Command{
 	Use:   "get-host",
 	Short: "Print the current server URL",
@@ -80,19 +63,15 @@ var getHostCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
 		if cfg.ServerURL == "" {
 			fmt.Println("No host configured. Run: mini config set-host <url>")
 			return nil
 		}
-
 		fmt.Println(cfg.ServerURL)
 		return nil
 	},
 }
 
 func init() {
-	configCmd.AddCommand(setHostCmd)
-	configCmd.AddCommand(getHostCmd)
-	configCmd.AddCommand(setAPIKeyCmd)
+	configCmd.AddCommand(setHostCmd, getHostCmd, setAPIKeyCmd)
 }

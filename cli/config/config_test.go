@@ -7,14 +7,13 @@ import (
 	"testing"
 )
 
-func TestSaveAndLoadAPIKey(t *testing.T) {
+func TestSaveAndLoadServerURL(t *testing.T) {
 	// Use temp dir to avoid touching real ~/.mini
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 
 	cfg := &config.Config{
-		ServerURL: "http://localhost:8080",
-		APIKey:    "test-api-key-123",
+		ServerURL: "https://example.test",
 	}
 
 	if err := config.Save(cfg); err != nil {
@@ -26,9 +25,6 @@ func TestSaveAndLoadAPIKey(t *testing.T) {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	if loaded.APIKey != cfg.APIKey {
-		t.Errorf("expected APIKey %q, got %q", cfg.APIKey, loaded.APIKey)
-	}
 	if loaded.ServerURL != cfg.ServerURL {
 		t.Errorf("expected ServerURL %q, got %q", cfg.ServerURL, loaded.ServerURL)
 	}
@@ -42,8 +38,8 @@ func TestLoad_NoConfigFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load should not fail when file missing: %v", err)
 	}
-	if cfg.APIKey != "" {
-		t.Error("expected empty APIKey on fresh config")
+	if cfg.ServerURL != "" {
+		t.Error("expected empty ServerURL on fresh config")
 	}
 }
 
@@ -51,7 +47,7 @@ func TestSave_CreatesDir(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 
-	cfg := &config.Config{APIKey: "key"}
+	cfg := &config.Config{ServerURL: "https://example.test"}
 	if err := config.Save(cfg); err != nil {
 		t.Fatalf("Save failed: %v", err)
 	}

@@ -2,11 +2,11 @@
 package keychain_test
 
 import (
+	kclib "mini-heroku/cli/keychain"
 	"os"
 	"testing"
 
 	"github.com/zalando/go-keyring"
-
 )
 
 // TestMain swaps in the in-memory mock so tests run without a real OS keychain.
